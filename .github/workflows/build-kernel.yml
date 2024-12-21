@@ -6,10 +6,6 @@ jobs:
   build:
     name: Build Kernel by ${{ github.actor }}
     runs-on: ubuntu-22.04
-    env:
-      CCACHE_COMPILERCHECK: "%compiler% -dumpmachine; %compiler% -dumpversion"
-      CCACHE_NOHASHDIR: "true"
-      CCACHE_HARDLINK: "true"
     steps:
     - uses: actions/checkout@v4
     - name: Remove unused packages
@@ -23,6 +19,12 @@ jobs:
         docker-images: true
         swap-storage: false
 
+    - name: Setup tmate session
+      uses: mxschmitt/action-tmate@v3
+      with:
+        sudo: true
+        detached: true
+
     - name: Set swap to 10G
       uses: pierotofy/set-swap-space@master
       with:
@@ -31,26 +33,19 @@ jobs:
     - name: Setup build kernel environment
       run: |
         sudo apt-get update
-        sudo apt-get install git ccache automake flex lzop bison gperf build-essential zip curl zlib1g-dev g++-multilib libxml2-utils bzip2 libbz2-dev libbz2-1.0 libghc-bzlib-dev squashfs-tools pngcrush schedtool dpkg-dev liblz4-tool make optipng maven libssl-dev pwgen libswitch-perl policycoreutils minicom libxml-sax-base-perl libxml-simple-perl bc libc6-dev-i386 lib32ncurses5-dev libx11-dev lib32z-dev libgl1-mesa-dev xsltproc unzip device-tree-compiler python2 python3
+        sudo apt-get install git repo ccache automake flex lzop bison gperf build-essential zip curl zlib1g-dev g++-multilib libxml2-utils bzip2 libbz2-dev libbz2-1.0 libghc-bzlib-dev squashfs-tools pngcrush schedtool dpkg-dev liblz4-tool make optipng maven libssl-dev pwgen libswitch-perl policycoreutils minicom libxml-sax-base-perl libxml-simple-perl bc libc6-dev-i386 lib32ncurses5-dev libx11-dev lib32z-dev libgl1-mesa-dev xsltproc unzip device-tree-compiler python2 python3
         mkdir -p $GITHUB_WORKSPACE/kernel_workspace
 
-    - name: Download Clang-aosp
+    - name: Get the kernel...
       run: |
         cd $GITHUB_WORKSPACE/kernel_workspace
-        mkdir clang-aosp
-        wget https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/master-kernel-build-2022/clang-r450784e.tar.gz
-        tar -C clang-aosp/ -zxvf clang-r450784e.tar.gz
-
-    - name: Download mkbootimg tools
-      run: |
-        cd $GITHUB_WORKSPACE/kernel_workspace
-        git clone https://android.googlesource.com/platform/system/tools/mkbootimg tools -b master-kernel-build-2022 --depth=1
-
-    - name: Setup tmate session
-      uses: mxschmitt/action-tmate@v3
-      with:
-        sudo: true
-        detached: true
+        mkdir oneplus12_v
+        cd ./oneplus12_v
+        repo init -u https://github.com/OnePlusOSS/kernel_manifest.git -b oneplus/sm8650 -m oneplus12_v.xml
+        repo sync -j$(nproc)
+        rm -rf ./kernel_platform/common/android/abi_gki_protected_exports_*
+        ./kernel_platform/oplus/build/oplus_build_kernel.sh pineapple gki
+        cp ./out/dist/Image ../Image
 
     - name: Upload boot image
       uses: actions/upload-artifact@v4
